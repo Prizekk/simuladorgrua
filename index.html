@@ -9,9 +9,9 @@ body{font-family:Arial;margin:0;background:#111820;color:#eee}.wrap{max-width:10
 .nav{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}.nav button.active{outline:2px solid #25c76b}
 .page{display:none}.page.active{display:block}
 .monitorgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:8px;margin-top:10px}
-.mon{background:#18222c;border:1px solid #3c4855;border-radius:10px;padding:10px;text-align:center}
+.mon{background:#18222c;border:1px solid #3c4855;border-radius:10px;padding:10px;text-align:center;cursor:pointer;user-select:none;transition:.15s transform,.15s border-color}.mon:active{transform:scale(.97)}
 .mon .biglamp{width:22px;height:22px;border-radius:50%;background:#687581;margin:0 auto 6px}.mon.on .biglamp{background:#25c76b}
-.mon .mtag{font:bold 17px Consolas}.mon .mstate{font-size:12px;color:#aab6c1;margin-top:3px}
+.mon .mtag{font:bold 17px Consolas}.mon .mstate{font-size:12px;color:#aab6c1;margin-top:3px}.mon .mmode{font-size:10px;margin-top:6px;font-weight:bold}.mon.forceon{border-color:#fbbf24}.mon.forceoff{border-color:#fb7185;opacity:.72}
 .timerMon{background:#18222c;border:1px solid #3c4855;border-radius:10px;padding:10px;margin-top:8px}
 .timerMon .line{display:flex;justify-content:space-between;gap:10px;margin-top:5px}
 
@@ -44,6 +44,19 @@ section h2{font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:#c
  #mSpeedBtns{grid-template-columns:repeat(5,1fr)!important}
 }
 
+
+/* PLEGABLES */
+.foldSection>h2{cursor:pointer;user-select:none;display:flex;align-items:center;gap:8px}
+.foldSection>h2:before{content:"▾";font-size:13px}
+.foldSection.folded>h2:before{content:"▸"}
+.foldSection.folded>.grid{display:none}
+.foldCard{padding:0!important;overflow:hidden}
+.foldHead{cursor:pointer;user-select:none;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.foldHead:after{content:"▾";font-size:12px}
+.foldCard.closed>.foldHead:after{content:"▸"}
+.foldBody{padding:0 14px 14px}
+.foldCard.closed>.foldBody{display:none}
+
 </style></head><body><div class="wrap"><h1>#2 HOIST — Morgan</h1><p>Simulador táctil de componentes y contactos auxiliares</p>
 <p class="note"><b>Modo:</b> AUTO = estado normal simulado; ON = forzado activado; OFF = forzado desactivado. AUX1 (NO) y AUX2 (NC) son contactos genéricos de prueba; no representan todavía la numeración exacta del plano.</p>
 <div class="nav"><button id="detailTab" class="active">PANTALLA DETALLE</button><button id="monitorTab">MONITOR SECUENCIA</button></div>
@@ -66,7 +79,7 @@ section h2{font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:#c
 <div id="monitorPage" class="page">
 <section class="card">
 <h2 style="margin-top:0">MONITOR DE SECUENCIA</h2>
-<div class="desc" style="min-height:0">Pantalla simplificada para seguir movimiento, velocidad, contactores y temporizadores.</div>
+<div class="desc" style="min-height:0">Pantalla simplificada para seguir movimiento, velocidad, contactores y temporizadores. Toca un contactor para cambiar AUTO → FORZADO ON → FORZADO OFF.</div>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
 <button id="mRaiseBtn">▲ SUBIR</button><button id="mLowerBtn">▼ BAJAR</button>
 </div>
@@ -209,7 +222,12 @@ function av(tag,i){
 function renderHX1Aux(){}
 function render(){
   renderHX1Aux();let app=document.querySelector("#app");app.innerHTML="";let groups=[["CONTACTORES / RELÉS",["coil","relay"]],["TIMERS",["timer"]],["SWITCHES / PROTECCIONES",["switch"]]];
-groups.forEach(([name,types])=>{let sec=document.createElement("section");sec.innerHTML="<h2>"+name+"</h2><div class=grid></div>";let g=sec.querySelector(".grid");
+groups.forEach(([name,types])=>{let sec=document.createElement("section");sec.className="foldSection";sec.innerHTML="<h2>"+name+"</h2><div class=grid></div>";let g=sec.querySelector(".grid");window._sectionFold=window._sectionFold||{};
+if(window._sectionFold[name])sec.classList.add("folded");
+sec.querySelector("h2").onclick=()=>{
+ sec.classList.toggle("folded");
+ window._sectionFold[name]=sec.classList.contains("folded");
+};
 P.filter(p=>types.includes(p[2])).forEach(([tag,d,type])=>{let x=S[tag],on=val(x,tag),c=document.createElement("div");c.className="card";
 let aux=x.aux.map((a,i)=>`<div class=row><span>${tag}-AUX${i+1} (${a.nc?"NC":"NO"}${type==="timer"?" TEMPORIZADO":""})<br><span class=state>${av(tag,i)?"CERRADO":"ABIERTO"}</span></span><span><button data-i=${i} data-a=auto class="${a.m==="auto"?"sel":""}">A</button><button data-i=${i} data-a=on class="${a.m==="on"?"sel":""}">ON</button><button data-i=${i} data-a=off class="${a.m==="off"?"sel":""}">OFF</button></span></div>`).join("");
 
@@ -219,7 +237,7 @@ if(tag==="2HX1"){
  <span><button onclick="cycleHX1Aux('NO1')" class="${HX1AUX.NO1.mode==="auto"?"sel":""}">${HX1AUX.NO1.mode.toUpperCase()}</button></span></div>
  <div class=row><span>NO2 → 2H3RT / 2HR4<br><span class=state>${hx1AuxVal("NO2")?"CERRADO":"ABIERTO"}</span></span>
  <span><button onclick="cycleHX1Aux('NO2')" class="${HX1AUX.NO2.mode==="auto"?"sel":""}">${HX1AUX.NO2.mode.toUpperCase()}</button></span></div>
- <div class=desc style="min-height:0;margin-top:6px">Ambos N.O. reciben alimentación desde el contacto N.O. de 2HUV. AUTO sigue la bobina 2HX1. ON fuerza el contacto cerrado y energiza su rama si 2HUV está cerrado: NO1 energiza 2H2RT y 2HR3; NO2 energiza 2H3RT y 2HR4. OFF fuerza el contacto abierto.</div>
+ 
  </div>`;
 }
 let timerUI="";
@@ -235,6 +253,26 @@ if(type==="timer"){
 }
 c.innerHTML=`<div><span class="lamp ${on?"on":""}"></span><span class=tag>${tag} · ${on?"ON":"OFF"}</span></div><div class=desc>${d}</div><div class=modes><button data-m=auto class="${x.mode==="auto"?"sel":""}">AUTO</button><button data-m=on class="${x.mode==="on"?"sel":""}">ON</button><button data-m=off class="${x.mode==="off"?"sel":""}">OFF</button></div>${timerUI}${aux?'<div class=aux><b>Contactos auxiliares</b>'+aux+'</div>':""}`;
 c.querySelectorAll("[data-m]").forEach(b=>b.onclick=()=>{x.mode=b.dataset.m;render()});c.querySelectorAll("[data-a]").forEach(b=>b.onclick=()=>{x.aux[+b.dataset.i].m=b.dataset.a;render()});
+c.querySelectorAll("[data-preset]").forEach(inp=>inp.onchange=()=>{let v=parseFloat(inp.value);if(Number.isFinite(v)&&v>=0.1&&v<=60)T[inp.dataset.preset].preset=v;render()});
+// El encabezado plegable ya muestra TAG + descripción.
+const firstInfo=c.querySelector(":scope > div:first-child");
+if(firstInfo) firstInfo.remove();
+const firstDesc=c.querySelector(":scope > .desc");
+if(firstDesc) firstDesc.remove();
+const body=c.innerHTML;
+
+// Recordar estado abierto/cerrado aunque render() se ejecute al forzar.
+window._foldOpen=window._foldOpen||{};
+const isOpen=!!window._foldOpen[tag];
+c.classList.add("foldCard");
+if(!isOpen)c.classList.add("closed");
+c.innerHTML=`<div class="foldHead"><div><span class="lamp ${on?"on":""}"></span><span class="tag">${tag} · ${on?"ON":"OFF"}</span><div class="desc" style="min-height:0">${d}</div></div></div><div class="foldBody">${body}</div>`;
+c.querySelector(".foldHead").onclick=()=>{
+ c.classList.toggle("closed");
+ window._foldOpen[tag]=!c.classList.contains("closed");
+};
+c.querySelectorAll("[data-m]").forEach(b=>b.onclick=()=>{x.mode=b.dataset.m;render()});
+c.querySelectorAll("[data-a]").forEach(b=>b.onclick=()=>{x.aux[+b.dataset.i].m=b.dataset.a;render()});
 c.querySelectorAll("[data-preset]").forEach(inp=>inp.onchange=()=>{let v=parseFloat(inp.value);if(Number.isFinite(v)&&v>=0.1&&v<=60)T[inp.dataset.preset].preset=v;render()});
 g.appendChild(c)});app.appendChild(sec)})}
 function timerCoil(tag){
@@ -270,8 +308,19 @@ function renderMonitor(){
  const tags=["2HUV","2HH","2HAL","2HL","2HS","2HE","2HP","2HR2","2HR3","2HR4","2HR5","2HX1"];
  mc.innerHTML=tags.map(tag=>{
    const on=val(S[tag],tag);
-   return `<div class="mon ${on?"on":""}"><div class="biglamp"></div><div class="mtag">${tag}</div><div class="mstate">${on?"ENERGIZADO":"DESENERGIZADO"}</div></div>`;
+   const mode=S[tag].mode;
+   const forceClass=mode==="on"?"forceon":mode==="off"?"forceoff":"";
+   const modeText=mode==="auto"?"AUTO":mode==="on"?"FORZADO ON":"FORZADO OFF";
+   return `<div class="mon ${on?"on":""} ${forceClass}" data-mcont="${tag}" title="Tocar para cambiar AUTO → ON → OFF"><div class="biglamp"></div><div class="mtag">${tag}</div><div class="mstate">${on?"ENERGIZADO":"DESENERGIZADO"}</div><div class="mmode">${modeText}</div></div>`;
  }).join("");
+ mc.querySelectorAll("[data-mcont]").forEach(el=>{
+   el.onclick=()=>{
+     const tag=el.dataset.mcont, x=S[tag];
+     x.mode=x.mode==="auto"?"on":x.mode==="on"?"off":"auto";
+     render();
+     updateMoveUI();
+   };
+ });
  document.querySelector("#monitorTimers").innerHTML=Object.keys(T).map(tag=>{
    const coil=timerCoil(tag),t=T[tag];
    return `<div class="timerMon">
