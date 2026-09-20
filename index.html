@@ -1,0 +1,325 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Simulador Puente Grúa Morgan · Izaje #2</title>
+<style>
+body{font-family:Arial;margin:0;background:#111820;color:#eee}.wrap{max-width:1000px;margin:auto;padding:14px}h1{font-size:21px}.note{background:#332b17;padding:12px;border-radius:10px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:9px}.card{background:#1b2530;border:1px solid #3c4855;border-radius:12px;padding:11px}.tag{font:bold 16px Consolas}.desc{color:#aab6c1;font-size:12px;min-height:30px}.modes{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:9px}button{min-height:42px;border:1px solid #526170;border-radius:8px;background:#27333f;color:#fff;font-weight:bold}.sel{outline:2px solid #f0b84b}.lamp{display:inline-block;width:13px;height:13px;border-radius:50%;background:#687581;margin-right:7px}.lamp.on{background:#25c76b}.aux{border-top:1px solid #3c4855;margin-top:10px;padding-top:8px}.row{display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:7px}.row button{min-height:34px;padding:4px 8px}.state{font-size:11px;color:#aab6c1}.timerbox{border-top:1px solid #3c4855;margin-top:10px;padding-top:9px}
+.timerline{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;margin-top:6px}
+.timerline input{width:80px;min-height:38px;background:#111820;color:#fff;border:1px solid #526170;border-radius:7px;padding:5px;font-size:16px}
+.bar{height:8px;background:#303b46;border-radius:5px;overflow:hidden;margin-top:7px}.fill{height:100%;background:#25c76b;width:0}
+@media(max-width:450px){.grid{grid-template-columns:1fr}}
+
+.nav{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}.nav button.active{outline:2px solid #25c76b}
+.page{display:none}.page.active{display:block}
+.monitorgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:8px;margin-top:10px}
+.mon{background:#18222c;border:1px solid #3c4855;border-radius:10px;padding:10px;text-align:center}
+.mon .biglamp{width:22px;height:22px;border-radius:50%;background:#687581;margin:0 auto 6px}.mon.on .biglamp{background:#25c76b}
+.mon .mtag{font:bold 17px Consolas}.mon .mstate{font-size:12px;color:#aab6c1;margin-top:3px}
+.timerMon{background:#18222c;border:1px solid #3c4855;border-radius:10px;padding:10px;margin-top:8px}
+.timerMon .line{display:flex;justify-content:space-between;gap:10px;margin-top:5px}
+
+/* ===== WEB APP UI 2026 ===== */
+:root{--bg:#0b1220;--panel:#111b2e;--panel2:#17233a;--line:#2b3b58;--text:#eef4ff;--muted:#9fb0ca;--ok:#2dd4bf;--warn:#fbbf24;--danger:#fb7185}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{max-width:1500px;margin:auto;padding:18px;background:radial-gradient(circle at top,#14213a 0,#0b1220 42%);color:var(--text)}
+header{position:sticky;top:0;z-index:20;background:rgba(11,18,32,.94);backdrop-filter:blur(12px);border:1px solid var(--line);border-radius:18px;padding:14px 16px;margin-bottom:14px;box-shadow:0 12px 35px rgba(0,0,0,.28)}
+header h1{margin:0;font-size:clamp(20px,3vw,30px);letter-spacing:.2px}
+header:after{content:"Simulación de control · Izaje #2";display:block;color:var(--muted);font-size:12px;margin-top:4px}
+button{min-height:42px;border-radius:10px;transition:.15s transform,.15s opacity}
+button:active{transform:scale(.97)}
+section{background:rgba(17,27,46,.9);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:14px;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+section h2{font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:#cbd8ed;margin:0 0 12px}
+.card{border:1px solid var(--line)!important;border-radius:14px!important;background:linear-gradient(180deg,var(--panel2),var(--panel))!important;box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.tag{font-size:16px!important;font-weight:800}
+.desc{color:var(--muted)!important}
+.state{font-weight:800}
+.timerbox{border-radius:12px!important;background:#0d1728!important;border:1px solid var(--line)!important}
+.note{border-radius:12px}
+#monitorContactors .card{min-height:90px}
+.webFooter{text-align:center;color:var(--muted);font-size:12px;padding:18px 8px 8px}
+@media(max-width:700px){
+ body{padding:8px}
+ header{top:6px;border-radius:14px}
+ section{padding:10px;border-radius:13px}
+ .grid,.monitorgrid{grid-template-columns:1fr!important}
+ button{min-height:46px;font-size:14px}
+ #mSpeedBtns{grid-template-columns:repeat(5,1fr)!important}
+}
+
+</style></head><body><div class="wrap"><h1>#2 HOIST — Morgan</h1><p>Simulador táctil de componentes y contactos auxiliares</p>
+<p class="note"><b>Modo:</b> AUTO = estado normal simulado; ON = forzado activado; OFF = forzado desactivado. AUX1 (NO) y AUX2 (NC) son contactos genéricos de prueba; no representan todavía la numeración exacta del plano.</p>
+<div class="nav"><button id="detailTab" class="active">PANTALLA DETALLE</button><button id="monitorTab">MONITOR SECUENCIA</button></div>
+<div id="detailPage" class="page active">
+<button id="reset">RESET / TODO AUTO</button>
+<section class="card" style="margin-top:14px">
+  <h2 style="margin-top:0">MANDO DE MOVIMIENTO</h2>
+  <div class="desc" style="min-height:0">Master virtual para probar subida, bajada y puntos de velocidad.</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+    <button id="raiseBtn">▲ SUBIR</button>
+    <button id="lowerBtn">▼ BAJAR</button>
+  </div>
+  <div style="margin-top:12px"><b>VELOCIDAD / PUNTO DEL MASTER</b></div>
+  <div id="speedBtns" style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:7px">
+    <button data-speed="1">1</button><button data-speed="2">2</button><button data-speed="3">3</button><button data-speed="4">4</button><button data-speed="5">5</button>
+  </div>
+  <div id="moveState" class="note" style="margin-bottom:0">NEUTRO · velocidad 1</div><div id="sequenceState" class="desc" style="margin-top:10px;min-height:0"></div>
+</section>
+<div id="app"></div></div>
+<div id="monitorPage" class="page">
+<section class="card">
+<h2 style="margin-top:0">MONITOR DE SECUENCIA</h2>
+<div class="desc" style="min-height:0">Pantalla simplificada para seguir movimiento, velocidad, contactores y temporizadores.</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+<button id="mRaiseBtn">▲ SUBIR</button><button id="mLowerBtn">▼ BAJAR</button>
+</div>
+<div id="mSpeedBtns" style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:8px">
+<button data-mspeed="1">1</button><button data-mspeed="2">2</button><button data-mspeed="3">3</button><button data-mspeed="4">4</button><button data-mspeed="5">5</button>
+</div>
+<div id="mMoveState" class="note" style="margin-top:10px"></div>
+<div class="desc" style="margin-top:8px;min-height:0">
+En BAJADA: 2HX1 permanece activo mientras el contacto NC temporizado de 2HT1 está cerrado.
+Al cumplirse 0,5 s de 2HT1 (DONE=1), el NC abre y 2HX1 se desenergiza.
+Los enclavamientos de 2HE→2HP, 2HH↔2HAL y 2HX1→2HL están incorporados a la simulación. La secuencia SUBIR de HR2–HR5 se corrigió según la tabla #2 HOIST CONTACTOR SEQUENCE: V1 HR5; V2 HR5; V3 HR4+HR5; V4 HR3+HR4+HR5; V5 HR2+HR3+HR4+HR5. Los contactos NO de dirección forman el permiso común: en SUBIDA se usa el NO de 2HH y en BAJADA el NO de 2HAL. La bobina de 2H2RT ahora depende además del contacto NO de 2HX1 conectado en serie; si ese contacto está abierto, 2H2RT no puede energizarse ni comenzar a temporizar. Ese mismo NO de 2HX1 también constituye un camino paralelo de alimentación hacia 2HR3: 2HR3 puede energizarse por su condición normal de velocidad O por el NO de 2HX1. Si el NO de 2HX1 se fuerza abierto, se elimina solo ese camino; 2HR3 aún puede entrar por su rama normal. 2HX1 dispone de dos contactos N.O. independientes: NO1 alimenta la rama 2H2RT/2HR3 y NO2 alimenta la rama 2H3RT/2HR4. Ambos contactos reciben permiso a través del N.O. de 2HUV. Cada N.O. de 2HX1 puede forzarse AUTO/ON/OFF de manera independiente. Si ese NO falla abierto, se bloquean 2HE, 2HP, 2HS y 2HL. 2HUV queda energizado en condición normal y su NO actúa como permiso de control.
+</div>
+</section>
+<section><h2>CONTACTORES / RELÉ</h2><div id="monitorContactors" class="monitorgrid"></div></section>
+<section><h2>TEMPORIZADORES</h2><div id="monitorTimers"></div></section>
+</div>
+</div>
+
+<div class="webFooter">Simulador técnico de control · Puente Grúa Morgan · Izaje #2<br>Herramienta de entrenamiento y diagnóstico basada en la lógica incorporada al simulador.</div>
+<script>
+const P=[
+["2HAL","#2 HOIST DOWN CONTACTOR","coil"],["2HAR","#2 HOIST ACCELERATING RESISTORS","dev"],["2HE","#2 HOIST BRAKE CONTACTOR","coil"],["2HH","#2 HOIST UP CONTACTOR","coil"],["2HL","#2 HOIST SHUNT CONTACTOR","coil"],["2HMA","#2 HOIST MOTOR ARMATURE","dev"],["2HMDLR","#2 HOIST DYNAMIC LOWERING RESISTOR","dev"],["2HMF","#2 HOIST MOTOR FIELD","dev"],["2HSHR","#2 HOIST SHUNT RESISTOR","dev"],["2HMSB","#2 HOIST MOTOR SERIES BRAKE","dev"],["2HOL","#2 HOIST OVERLOAD - ELECTRONIC","switch"],["2HP","#2 HOIST POWER CONTACTOR","coil"],["2HPF1","#2 HOIST POWER FUSE #1","switch"],["2HPF2","#2 HOIST POWER FUSE #2","switch"],["2HR2","#2 HOIST ACCELERATING CONTACTOR #2","coil"],["2HR3","#2 HOIST ACCELERATING CONTACTOR #3","coil"],["2HR4","#2 HOIST ACCELERATING CONTACTOR #4","coil"],["2HR5","#2 HOIST ACCELERATING CONTACTOR #5","coil"],["2HS","#2 HOIST SHUNT CONTACTOR","coil"],["2HT1","#2 HOIST DOWN TIMER - ON DELAY","timer"],["2HUV","#2 HOIST UNDERVOLTAGE CONTACTOR","coil"],["2HX1","#2 HOIST DOWN RELAY - 4 POLE","relay"],["2H2RT","#2 HOIST ACCELERATING TIMER #2 - ON DELAY","timer"],["2H3RT","#2 HOIST ACCELERATING TIMER #3 - ON DELAY","timer"],["2RLS","POWER LIMIT SWITCH","switch"],["2LSDPR","#2 HOIST LS DYNAMIC BRAKING RESISTOR","dev"],["1LT","ENCLOSURE LIGHT #1","dev"],["2LT","ENCLOSURE LIGHT #2","dev"],["1SS","ENCLOSURE LIGHT SWITCH","switch"],["2HMS","#2 HOIST MASTER SWITCH","switch"],["2HCF1","#2 HOIST CONTROL FUSE #1","switch"],["2HCF2","#2 HOIST CONTROL FUSE #2","switch"],["AUX","AUX. CONTACT FROM MAINLINE DISC. SWITCH","switch"]];
+const hasAux=t=>["coil","timer","relay"].includes(t);let S={};let M={dir:"neutral",speed:1};
+const T={
+ "2HT1":{preset:0.5,elapsed:0,done:false,last:false},
+ "2H2RT":{preset:1.5,elapsed:0,done:false,last:false},
+ "2H3RT":{preset:1.5,elapsed:0,done:false,last:false}
+};
+let lastTick=performance.now();
+function init(){S={};P.forEach(([tag,,type])=>S[tag]={mode:"auto",auto:false,aux:hasAux(type)?[{m:"auto",nc:false},{m:"auto",nc:true}]:[]});["2HPF1","2HPF2","2HCF1","2HCF2","2RLS","AUX","2HUV"].forEach(k=>S[k].auto=true)}
+function timerInput(tag){
+  if(tag==="2HT1") return M.dir==="down";
+  if(tag==="2H2RT") return hx1AuxVal("NO1");
+  if(tag==="2H3RT") return hx1AuxVal("NO2");
+  return false;
+}
+
+const HX1AUX = {
+  NO1:{mode:"auto"}, // Rama 2H2RT / 2HR3
+  NO2:{mode:"auto"}  // Rama 2H3RT / 2HR4
+};
+
+function hx1AuxVal(which){
+  const c = HX1AUX[which];
+  const uvPermit = av("2HUV",0);
+  if(c.mode==="off") return false;
+  if(c.mode==="on") return uvPermit;
+  // AUTO: el contacto sigue físicamente a la bobina 2HX1 y recibe
+  // alimentación aguas arriba por el N.O. de 2HUV.
+  return uvPermit && val(S["2HX1"],"2HX1");
+}
+
+function cycleHX1Aux(which){
+  const c=HX1AUX[which];
+  c.mode = c.mode==="auto" ? "on" : c.mode==="on" ? "off" : "auto";
+  render();
+}
+function permisoDireccion(){
+  // Permiso común de marcha por contactos NO de los contactores de dirección.
+  // Importante: usa av(), por lo que una bobina puede estar ON y su NO ser
+  // forzado abierto para simular una falla real de contacto.
+  if(M.dir==="up") return av("2HH",0);
+  if(M.dir==="down") return av("2HAL",0);
+  return false;
+}
+function autoCommand(tag){
+  // Ramas directas provenientes de los dos N.O. independientes de 2HX1.
+  // Si existe alimentación por 2HUV y se cierra el contacto correspondiente,
+  // la carga conectada a esa rama recibe alimentación independientemente de
+  // la posición actual del master.
+  if(tag==="2HR3" && hx1AuxVal("NO1")) return true;
+  if(tag==="2HR4" && hx1AuxVal("NO2")) return true;
+  const s=M.speed;
+  if(tag in T) return timerInput(tag);
+
+  // Base sequence from the #2 HOIST CONTACTOR SEQUENCE table.
+  // Electrical interlocks from the control sheet are then applied below.
+  if(M.dir==="up"){
+    if(tag==="2HH") return av("2HUV",0);
+    if(tag==="2HAL") return false;
+    if(tag==="2HE") return av("2HUV",0) && permisoDireccion();
+
+    // 2HP is not allowed to pick up unless the NO auxiliary of 2HE is really closed.
+    if(tag==="2HP") return av("2HUV",0) && permisoDireccion() && av("2HE",0);
+
+    if(tag==="2HL") return s===1 && permisoDireccion() && av("2HX1",1); // NC 2HX1
+    if(tag==="2HS") return s===1 && permisoDireccion();
+    // RAISE sequence from the #2 HOIST CONTACTOR SEQUENCE table:
+    // V1: HR5
+    // V2: HR5
+    // V3: HR4 + HR5
+    // V4: HR3 + HR4 + HR5
+    // V5: HR2 + HR3 + HR4 + HR5
+    // The 2HX1 NO branches remain valid parallel paths for HR3/HR4.
+    if(tag==="2HR2") return s===5;
+    if(tag==="2HR3") return (s>=4) || hx1AuxVal("NO1");
+    if(tag==="2HR4") return (s>=3) || hx1AuxVal("NO2");
+    if(tag==="2HR5") return s>=1;
+  }
+
+  if(M.dir==="down"){
+    if(tag==="2HH") return false;
+
+    // Electrical interlock: lowering contactor requires the NC auxiliary of 2HH.
+    if(tag==="2HAL") return av("2HUV",0) && av("2HH",1);
+
+    if(tag==="2HE") return av("2HUV",0) && permisoDireccion();
+
+    // Same 2HE permissive for 2HP: a failed-open NO contact of 2HE blocks 2HP.
+    if(tag==="2HP") return av("2HUV",0) && permisoDireccion() && av("2HE",0);
+
+    // 2HX1 is held only while the timed NC contact of 2HT1 remains closed.
+    if(tag==="2HX1") return !T["2HT1"].done;
+
+    // 2HL branch includes an NC contact of 2HX1.
+    if(tag==="2HL") return s>=4 && permisoDireccion() && av("2HX1",1);
+
+    if(tag==="2HS") return permisoDireccion();
+    if(tag==="2HR2") return s===1;
+    if(tag==="2HR3") return (s<=2) || hx1AuxVal("NO1");
+    if(tag==="2HR4") return (s<=3) || hx1AuxVal("NO2");
+    if(tag==="2HR5") return s<=4;
+  }
+
+  if(M.dir==="neutral"){
+    const controlled=["2HH","2HAL","2HL","2HS","2HE","2HP","2HR2","2HR3","2HR4","2HR5","2HX1","2HT1","2H2RT","2H3RT"];
+    if(controlled.includes(tag)) return false;
+  }
+  return null;
+}
+function val(x,tag){if(x.mode==="on")return true;if(x.mode==="off")return false;let c=autoCommand(tag);return c===null?x.auto:c}
+function av(tag,i){
+ let c=S[tag].aux[i];
+ if(c.m==="on")return true;
+ if(c.m==="off")return false;
+ // En temporizadores ON DELAY, los contactos temporizados dependen de DONE,
+ // no del estado instantáneo de la bobina.
+ if(tag in T){
+   return c.nc ? !T[tag].done : T[tag].done;
+ }
+ return c.nc?!val(S[tag],tag):val(S[tag],tag);
+}
+
+function renderHX1Aux(){}
+function render(){
+  renderHX1Aux();let app=document.querySelector("#app");app.innerHTML="";let groups=[["CONTACTORES / RELÉS",["coil","relay"]],["TIMERS",["timer"]],["SWITCHES / PROTECCIONES",["switch"]]];
+groups.forEach(([name,types])=>{let sec=document.createElement("section");sec.innerHTML="<h2>"+name+"</h2><div class=grid></div>";let g=sec.querySelector(".grid");
+P.filter(p=>types.includes(p[2])).forEach(([tag,d,type])=>{let x=S[tag],on=val(x,tag),c=document.createElement("div");c.className="card";
+let aux=x.aux.map((a,i)=>`<div class=row><span>${tag}-AUX${i+1} (${a.nc?"NC":"NO"}${type==="timer"?" TEMPORIZADO":""})<br><span class=state>${av(tag,i)?"CERRADO":"ABIERTO"}</span></span><span><button data-i=${i} data-a=auto class="${a.m==="auto"?"sel":""}">A</button><button data-i=${i} data-a=on class="${a.m==="on"?"sel":""}">ON</button><button data-i=${i} data-a=off class="${a.m==="off"?"sel":""}">OFF</button></span></div>`).join("");
+
+if(tag==="2HX1"){
+ aux += `<div class="timerbox"><b>CONTACTOS N.O. DE 2HX1</b>
+ <div class=row><span>NO1 → 2H2RT / 2HR3<br><span class=state>${hx1AuxVal("NO1")?"CERRADO":"ABIERTO"}</span></span>
+ <span><button onclick="cycleHX1Aux('NO1')" class="${HX1AUX.NO1.mode==="auto"?"sel":""}">${HX1AUX.NO1.mode.toUpperCase()}</button></span></div>
+ <div class=row><span>NO2 → 2H3RT / 2HR4<br><span class=state>${hx1AuxVal("NO2")?"CERRADO":"ABIERTO"}</span></span>
+ <span><button onclick="cycleHX1Aux('NO2')" class="${HX1AUX.NO2.mode==="auto"?"sel":""}">${HX1AUX.NO2.mode.toUpperCase()}</button></span></div>
+ <div class=desc style="min-height:0;margin-top:6px">Ambos N.O. reciben alimentación desde el contacto N.O. de 2HUV. AUTO sigue la bobina 2HX1. ON fuerza el contacto cerrado y energiza su rama si 2HUV está cerrado: NO1 energiza 2H2RT y 2HR3; NO2 energiza 2H3RT y 2HR4. OFF fuerza el contacto abierto.</div>
+ </div>`;
+}
+let timerUI="";
+if(type==="timer"){
+ let t=T[tag];
+ timerUI=`<div class=timerbox><b>Temporización ON DELAY</b>
+ <div class=timerline><span>Preset (s)</span><input data-preset="${tag}" type="number" min="0.1" max="60" step="0.1" value="${t.preset}"></div>
+ <div class=timerline><span>Tiempo transcurrido</span><b>${t.elapsed.toFixed(1)} s</b></div>
+ <div class=timerline><span>DONE</span><b>${t.done?"1 · TIEMPO CUMPLIDO":"0 · CONTANDO/REPOSO"}</b></div>
+ <div class=timerline><span>NO temporizado</span><b>${t.done?"CERRADO":"ABIERTO"}</b></div>
+ <div class=timerline><span>NC temporizado</span><b>${t.done?"ABIERTO":"CERRADO"}</b></div>
+ <div class=bar><div class=fill style="width:${Math.min(100,t.elapsed/t.preset*100)}%"></div></div></div>`;
+}
+c.innerHTML=`<div><span class="lamp ${on?"on":""}"></span><span class=tag>${tag} · ${on?"ON":"OFF"}</span></div><div class=desc>${d}</div><div class=modes><button data-m=auto class="${x.mode==="auto"?"sel":""}">AUTO</button><button data-m=on class="${x.mode==="on"?"sel":""}">ON</button><button data-m=off class="${x.mode==="off"?"sel":""}">OFF</button></div>${timerUI}${aux?'<div class=aux><b>Contactos auxiliares</b>'+aux+'</div>':""}`;
+c.querySelectorAll("[data-m]").forEach(b=>b.onclick=()=>{x.mode=b.dataset.m;render()});c.querySelectorAll("[data-a]").forEach(b=>b.onclick=()=>{x.aux[+b.dataset.i].m=b.dataset.a;render()});
+c.querySelectorAll("[data-preset]").forEach(inp=>inp.onchange=()=>{let v=parseFloat(inp.value);if(Number.isFinite(v)&&v>=0.1&&v<=60)T[inp.dataset.preset].preset=v;render()});
+g.appendChild(c)});app.appendChild(sec)})}
+function timerCoil(tag){
+ const x=S[tag];
+ if(x.mode==="on") return true;
+ if(x.mode==="off") return false;
+ return timerInput(tag);
+}
+function tick(now){
+ const dt=Math.min(.25,(now-lastTick)/1000);lastTick=now;
+ let changed=false;
+ Object.keys(T).forEach(tag=>{
+   let t=T[tag], input=timerCoil(tag);
+   if(input){
+     let before=t.done;
+     t.elapsed=Math.min(t.preset,t.elapsed+dt);
+     t.done=t.elapsed>=t.preset;
+     if(before!==t.done) changed=true;
+   }else{
+     if(t.elapsed!==0||t.done) changed=true;
+     t.elapsed=0;t.done=false;
+   }
+ });
+ // Refresh roughly every 100 ms while any timer is running, without stacking intervals.
+ if(Object.keys(T).some(k=>timerCoil(k)&&!T[k].done) || changed){render();updateMoveUI();}
+ requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+function renderMonitor(){
+ const mc=document.querySelector("#monitorContactors");
+ if(!mc)return;
+ const tags=["2HUV","2HH","2HAL","2HL","2HS","2HE","2HP","2HR2","2HR3","2HR4","2HR5","2HX1"];
+ mc.innerHTML=tags.map(tag=>{
+   const on=val(S[tag],tag);
+   return `<div class="mon ${on?"on":""}"><div class="biglamp"></div><div class="mtag">${tag}</div><div class="mstate">${on?"ENERGIZADO":"DESENERGIZADO"}</div></div>`;
+ }).join("");
+ document.querySelector("#monitorTimers").innerHTML=Object.keys(T).map(tag=>{
+   const coil=timerCoil(tag),t=T[tag];
+   return `<div class="timerMon">
+    <div class="line"><b>${tag}</b><b>${coil?"BOBINA ON":"BOBINA OFF"}</b></div>
+    <div class="line"><span>Tiempo</span><span>${t.elapsed.toFixed(1)} / ${t.preset.toFixed(1)} s</span></div>
+    <div class="bar"><div class="fill" style="width:${Math.min(100,t.elapsed/t.preset*100)}%"></div></div>
+    <div class="line"><span>DONE</span><b>${t.done?"1":"0"}</b></div>
+    <div class="line"><span>NO temporizado</span><b>${t.done?"CERRADO":"ABIERTO"}</b></div>
+    <div class="line"><span>NC temporizado</span><b>${t.done?"ABIERTO":"CERRADO"}</b></div>
+   </div>`;
+ }).join("");
+ const mm=document.querySelector("#mMoveState");
+ mm.textContent=(M.dir==="up"?"SUBIDA":M.dir==="down"?"BAJADA":"NEUTRO")+" · velocidad "+M.speed;
+ document.querySelector("#mRaiseBtn").classList.toggle("sel",M.dir==="up");
+ document.querySelector("#mLowerBtn").classList.toggle("sel",M.dir==="down");
+ document.querySelectorAll("[data-mspeed]").forEach(b=>b.classList.toggle("sel",+b.dataset.mspeed===M.speed));
+}
+function updateMoveUI(){
+ const st=document.querySelector("#moveState");
+ st.textContent=(M.dir==="up"?"SUBIDA":M.dir==="down"?"BAJADA":"NEUTRO")+" · velocidad "+M.speed;
+ document.querySelector("#raiseBtn").classList.toggle("sel",M.dir==="up");
+ document.querySelector("#lowerBtn").classList.toggle("sel",M.dir==="down");
+ document.querySelectorAll("[data-speed]").forEach(b=>b.classList.toggle("sel",+b.dataset.speed===M.speed));
+ const tags=["2HH","2HAL","2HL","2HS","2HE","2HP","2HR2","2HR3","2HR4","2HR5"];
+ renderMonitor();
+ const energized=tags.filter(t=>val(S[t],t));
+ document.querySelector("#sequenceState").innerHTML="<b>Contactores energizados:</b> "+(energized.length?energized.join(" · "):"ninguno");
+}
+function setDir(d){M.dir=(M.dir===d?"neutral":d);updateMoveUI();render()}
+document.querySelector("#raiseBtn").onclick=()=>setDir("up");
+document.querySelector("#lowerBtn").onclick=()=>setDir("down");
+document.querySelectorAll("[data-speed]").forEach(b=>b.onclick=()=>{M.speed=+b.dataset.speed;updateMoveUI();render()});
+document.querySelector("#reset").onclick=()=>{M={dir:"neutral",speed:1};Object.values(T).forEach(t=>{t.elapsed=0;t.done=false});init();updateMoveUI();render()};
+
+document.querySelector("#detailTab").onclick=()=>{
+ document.querySelector("#detailPage").classList.add("active");document.querySelector("#monitorPage").classList.remove("active");
+ document.querySelector("#detailTab").classList.add("active");document.querySelector("#monitorTab").classList.remove("active");
+};
+document.querySelector("#monitorTab").onclick=()=>{
+ document.querySelector("#monitorPage").classList.add("active");document.querySelector("#detailPage").classList.remove("active");
+ document.querySelector("#monitorTab").classList.add("active");document.querySelector("#detailTab").classList.remove("active");renderMonitor();
+};
+document.querySelector("#mRaiseBtn").onclick=()=>{M.dir=M.dir==="up"?"neutral":"up";updateMoveUI();render()};
+document.querySelector("#mLowerBtn").onclick=()=>{M.dir=M.dir==="down"?"neutral":"down";updateMoveUI();render()};
+document.querySelectorAll("[data-mspeed]").forEach(b=>b.onclick=()=>{M.speed=+b.dataset.mspeed;updateMoveUI();render()});
+init();updateMoveUI();render();
+</script></body></html>
