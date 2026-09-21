@@ -57,9 +57,15 @@ section h2{font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:#c
 .foldBody{padding:0 14px 14px}
 .foldCard.closed>.foldBody{display:none}
 
+
+.diagrow{display:flex;align-items:flex-start;gap:10px;padding:10px;border-bottom:1px solid var(--line)}
+.diagdot{width:14px;height:14px;border-radius:50%;margin-top:3px;flex:0 0 14px;background:#64748b}
+.diagrow.ok .diagdot{background:#2dd4bf}.diagrow.bad .diagdot{background:#fb7185}.diagrow.warn .diagdot{background:#fbbf24}
+.diagrow b{display:block}.diagrow small{color:var(--muted)}
+#diagPath{border:1px solid var(--line);border-radius:12px;overflow:hidden}
 </style></head><body><div class="wrap"><h1>#2 HOIST — Morgan</h1><p>Simulador táctil de componentes y contactos auxiliares</p>
 <p class="note"><b>Modo:</b> AUTO = estado normal simulado; ON = forzado activado; OFF = forzado desactivado. AUX1 (NO) y AUX2 (NC) son contactos genéricos de prueba; no representan todavía la numeración exacta del plano.</p>
-<div class="nav"><button id="detailTab" class="active">PANTALLA DETALLE</button><button id="monitorTab">MONITOR SECUENCIA</button></div>
+<div class="nav"><button id="detailTab" class="active">PANTALLA DETALLE</button><button id="monitorTab">MONITOR SECUENCIA</button><button id="diagTab">DIAGNÓSTICO</button></div>
 <div id="detailPage" class="page active">
 <button id="reset">RESET / TODO AUTO</button>
 <section class="card" style="margin-top:14px">
@@ -92,6 +98,18 @@ section h2{font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:#c
 <section><h2>CONTACTORES / RELÉ</h2><div id="monitorContactors" class="monitorgrid"></div></section>
 <section><h2>TEMPORIZADORES</h2><div id="monitorTimers"></div></section>
 </div>
+<div id="diagPage" class="page">
+<section class="card">
+<h2 style="margin-top:0">DIAGNÓSTICO ASISTIDO</h2>
+<div class="desc" style="min-height:0">Reproduce primero la falla en DETALLE o MONITOR. El diagnóstico revisa la cadena principal, 2HX1, NO1/NO2, temporizadores y la secuencia HR2–HR5 correspondiente a la velocidad seleccionada.</div>
+<button id="diagnoseBtn" style="width:100%;margin-top:12px">ANALIZAR ESTADO ACTUAL</button>
+</section>
+<section>
+<h2>RESULTADO</h2>
+<div id="diagSummary" class="note">Presiona ANALIZAR ESTADO ACTUAL.</div>
+<div id="diagPath" style="margin-top:10px"></div>
+</section>
+</div>
 </div>
 
 <div class="webFooter">Simulador técnico de control · Puente Grúa Morgan · Izaje #2<br>Herramienta de entrenamiento y diagnóstico basada en la lógica incorporada al simulador.</div>
@@ -108,14 +126,14 @@ let lastTick=performance.now();
 function init(){S={};P.forEach(([tag,,type])=>S[tag]={mode:"auto",auto:false,aux:hasAux(type)?[{m:"auto",nc:false},{m:"auto",nc:true}]:[]});["2HPF1","2HPF2","2HCF1","2HCF2","2RLS","AUX","2HUV"].forEach(k=>S[k].auto=true)}
 function timerInput(tag){
   if(tag==="2HT1") return M.dir==="down";
-  if(tag==="2H2RT") return hx1AuxVal("NO1");
-  if(tag==="2H3RT") return hx1AuxVal("NO2");
+  if(tag==="2H2RT") return feed2H29Node(); // nodo común: 2H29 OR 2HX1-NO1 OR (2H32A AND 2H3RT-NO temporizado AND 2HR4-NO)
+  if(tag==="2H3RT") return hx1AuxVal("NO2") || master2H33(); // N.O. 2HX1 OR misma vía de alimentación de la bobina 2HR4 (2H33)
   return false;
 }
 
 const HX1AUX = {
   NO1:{mode:"auto"}, // Rama 2H2RT / 2HR3
-  NO2:{mode:"auto"}  // Rama 2H3RT / 2HR4
+  NO2:{mode:"auto"}  // Rama 2H3RT / 2HR4; 2H3RT además recibe la vía común 2H33 asociada a 2HR4
 };
 
 function hx1AuxVal(which){
@@ -141,12 +159,52 @@ function permisoDireccion(){
   if(M.dir==="down") return av("2HAL",0);
   return false;
 }
+// Señales directas del master confirmadas para los contactores de aceleración.
+// 2H33 alimenta directamente 2HR4 según la posición del master.
+// 2H37 alimenta directamente 2HR5, sin contactos adicionales en serie.
+function master2H33(){
+  const s=M.speed;
+  if(M.dir==="up") return s>=3;
+  if(M.dir==="down") return s<=3;
+  return false;
+}
+function master2H37(){
+  const s=M.speed;
+  if(M.dir==="up") return s>=1;
+  if(M.dir==="down") return s<=4;
+  return false;
+}
+
+// Señales del master confirmadas para la rama 2H2RT / 2HR3.
+// 2H29: BAJADA velocidades 1 y 2. En SUBIDA no se alimenta.
+function master2H29(){ return M.dir==="down" && M.speed<=2; }
+// 2H32A: SUBIDA velocidades 4 y 5.
+function master2H32A(){ return M.dir==="up" && M.speed>=4; }
+
+// 2H27B: señal del master confirmada para 2HR2.
+// Se energiza en BAJADA V1 y SUBIDA V5.
+function master2H27B(){
+  return (M.dir==="down" && M.speed===1) || (M.dir==="up" && M.speed===5);
+}
+
+// Alimentación real de la bobina 2HR2:
+// 2H27B AND [ (N.O. temporizado 2H2RT AND N.O. 2HR3) OR N.C. 2HH ].
+function feed2HR2(){
+  return master2H27B() && ((av("2H2RT",0) && av("2HR3",0)) || av("2HH",1));
+}
+
+// Nodo común que alimenta en paralelo las bobinas 2H2RT y 2HR3:
+// 2H29 OR N.O.#1 de 2HX1 OR [2H32A AND N.O. temporizado 2H3RT AND N.O. auxiliar 2HR4].
+function feed2H29Node(){
+  return master2H29() || hx1AuxVal("NO1") || (master2H32A() && av("2H3RT",0) && av("2HR4",0));
+}
+
 function autoCommand(tag){
   // Ramas directas provenientes de los dos N.O. independientes de 2HX1.
   // Si existe alimentación por 2HUV y se cierra el contacto correspondiente,
   // la carga conectada a esa rama recibe alimentación independientemente de
   // la posición actual del master.
-  if(tag==="2HR3" && hx1AuxVal("NO1")) return true;
+  if(tag==="2HR3" && feed2H29Node()) return true;
   if(tag==="2HR4" && hx1AuxVal("NO2")) return true;
   const s=M.speed;
   if(tag in T) return timerInput(tag);
@@ -169,11 +227,12 @@ function autoCommand(tag){
     // V3: HR4 + HR5
     // V4: HR3 + HR4 + HR5
     // V5: HR2 + HR3 + HR4 + HR5
-    // The 2HX1 NO branches remain valid parallel paths for HR3/HR4.
-    if(tag==="2HR2") return s===5;
-    if(tag==="2HR3") return (s>=4) || hx1AuxVal("NO1");
-    if(tag==="2HR4") return (s>=3) || hx1AuxVal("NO2");
-    if(tag==="2HR5") return s>=1;
+    // Para 2HR4: la señal directa 2H33 del master está en paralelo con el N.O. correspondiente de 2HX1.
+    // Para 2HR5: alimentación directa desde 2H37 del master, sin contacto adicional en serie.
+    if(tag==="2HR2") return feed2HR2(); // 2H27B AND [(2H2RT-NO TEMP AND 2HR3-NO) OR 2HH-NO]
+    if(tag==="2HR3") return feed2H29Node();
+    if(tag==="2HR4") return master2H33() || hx1AuxVal("NO2"); // 2H33 OR N.O. 2HX1
+    if(tag==="2HR5") return master2H37(); // alimentación directa 2H37 desde master
   }
 
   if(M.dir==="down"){
@@ -194,10 +253,10 @@ function autoCommand(tag){
     if(tag==="2HL") return s>=4 && permisoDireccion() && av("2HX1",1);
 
     if(tag==="2HS") return permisoDireccion();
-    if(tag==="2HR2") return s===1;
-    if(tag==="2HR3") return (s<=2) || hx1AuxVal("NO1");
-    if(tag==="2HR4") return (s<=3) || hx1AuxVal("NO2");
-    if(tag==="2HR5") return s<=4;
+    if(tag==="2HR2") return feed2HR2(); // 2H27B AND [(2H2RT-NO TEMP AND 2HR3-NO) OR 2HH-NO]
+    if(tag==="2HR3") return feed2H29Node();
+    if(tag==="2HR4") return master2H33() || hx1AuxVal("NO2"); // 2H33 OR N.O. 2HX1
+    if(tag==="2HR5") return master2H37(); // alimentación directa 2H37 desde master
   }
 
   if(M.dir==="neutral"){
@@ -233,7 +292,7 @@ let aux=x.aux.map((a,i)=>`<div class=row><span>${tag}-AUX${i+1} (${a.nc?"NC":"NO
 
 if(tag==="2HX1"){
  aux += `<div class="timerbox"><b>CONTACTOS N.O. DE 2HX1</b>
- <div class=row><span>NO1 → 2H2RT / 2HR3<br><span class=state>${hx1AuxVal("NO1")?"CERRADO":"ABIERTO"}</span></span>
+ <div class=row><span>NO1 → nodo 2H29 → 2H2RT / 2HR3<br><span class=state>${hx1AuxVal("NO1")?"CERRADO":"ABIERTO"}</span></span>
  <span><button onclick="cycleHX1Aux('NO1')" class="${HX1AUX.NO1.mode==="auto"?"sel":""}">${HX1AUX.NO1.mode.toUpperCase()}</button></span></div>
  <div class=row><span>NO2 → 2H3RT / 2HR4<br><span class=state>${hx1AuxVal("NO2")?"CERRADO":"ABIERTO"}</span></span>
  <span><button onclick="cycleHX1Aux('NO2')" class="${HX1AUX.NO2.mode==="auto"?"sel":""}">${HX1AUX.NO2.mode.toUpperCase()}</button></span></div>
@@ -355,13 +414,98 @@ document.querySelector("#lowerBtn").onclick=()=>setDir("down");
 document.querySelectorAll("[data-speed]").forEach(b=>b.onclick=()=>{M.speed=+b.dataset.speed;updateMoveUI();render()});
 document.querySelector("#reset").onclick=()=>{M={dir:"neutral",speed:1};Object.values(T).forEach(t=>{t.elapsed=0;t.done=false});init();updateMoveUI();render()};
 
+
+
+function diagItem(ok,label,detail,kind=""){
+ const cls=kind|| (ok?"ok":"bad");
+ return `<div class="diagrow ${cls}"><span class="diagdot"></span><div><b>${label}</b><small>${detail}</small></div></div>`;
+}
+function expectedSpeedTags(){
+ const v=M.speed;
+ if(M.dir==="up"){
+   return { "2HR2":v===5, "2HR3":v>=4, "2HR4":v>=3, "2HR5":v>=1 };
+ }
+ if(M.dir==="down"){
+   return { "2HR2":v===1, "2HR3":v<=2, "2HR4":v<=3, "2HR5":v<=4 };
+ }
+ return {};
+}
+function diagnose(){
+ const rows=[], causes=[];
+ const add=(ok,l,d)=>{rows.push(diagItem(ok,l,d)); if(!ok)causes.push(l);};
+ const uv=val(S["2HUV"],"2HUV"), uvno=av("2HUV",0);
+ add(uv,"2HUV",uv?"Bobina energizada.":"Sin bobina: revisar alimentación/permisos de control.");
+ add(uvno,"N.O. 2HUV",uvno?"Permiso general cerrado.":"Abierto: corta las ramas alimentadas desde 2HUV.");
+
+ if(M.dir==="neutral"){
+   document.querySelector("#diagSummary").innerHTML="<b>Equipo en NEUTRO.</b> Selecciona SUBIR o BAJAR, elige velocidad y reproduce la falla.";
+   document.querySelector("#diagPath").innerHTML=rows.join("");
+   return;
+ }
+
+ if(M.dir==="up"){
+   const hh=val(S["2HH"],"2HH"), hhno=av("2HH",0);
+   add(hh,"2HH",hh?"Contactor SUBIR energizado.":"No energiza: revisar N.O. 2HUV.");
+   add(hhno,"N.O. 2HH",hhno?"Permiso de dirección cerrado.":"Abierto: se pierde la cadena común de SUBIDA.");
+ }else{
+   const hal=val(S["2HAL"],"2HAL"), halno=av("2HAL",0), hhnc=av("2HH",1);
+   add(hhnc,"N.C. 2HH",hhnc?"Enclavamiento permite BAJADA.":"Abierto: impide energizar 2HAL.");
+   add(hal,"2HAL",hal?"Contactor BAJAR energizado.":"No energiza: revisar 2HUV y N.C. 2HH.");
+   add(halno,"N.O. 2HAL",halno?"Permiso de dirección cerrado.":"Abierto: se pierde la cadena común de BAJADA.");
+ }
+
+ const he=val(S["2HE"],"2HE"), heno=av("2HE",0), hp=val(S["2HP"],"2HP");
+ add(he,"2HE",he?"Contactor de freno energizado.":"No energiza: revisar permiso de dirección.");
+ add(heno,"N.O. 2HE",heno?"Contacto hacia 2HP cerrado.":"Abierto: 2HP pierde este permiso.");
+ add(hp,"2HP",hp?"Contactor de potencia energizado.":"No energiza: revisar N.O. 2HE y cadena aguas arriba.");
+
+ if(M.dir==="down"){
+   const hx=val(S["2HX1"],"2HX1");
+   const no1=hx1AuxVal("NO1"), no2=hx1AuxVal("NO2");
+   const ht=T["2HT1"];
+   rows.push(diagItem(true,"2HT1",`Bobina ${timerCoil("2HT1")?"ON":"OFF"} · ${ht.elapsed.toFixed(1)}/${ht.preset.toFixed(1)} s · DONE=${ht.done?1:0}`, "warn"));
+   rows.push(diagItem(hx,"2HX1",hx?"Relé energizado durante la etapa inicial de bajada.":"Relé desenergizado. Si 2HT1 ya cumplió su tiempo, este estado puede ser normal.",hx?"ok":"warn"));
+   rows.push(diagItem(no1,"2HX1-NO1",no1?"Cerrado: alimenta rama 2H2RT / 2HR3.":"Abierto: esa rama no recibe alimentación por 2HX1.",no1?"ok":"warn"));
+   rows.push(diagItem(no2,"2HX1-NO2",no2?"Cerrado: alimenta rama 2H3RT / 2HR4.":"Abierto: esa rama no recibe alimentación por 2HX1.",no2?"ok":"warn"));
+ }
+
+ ["2H2RT","2H3RT"].forEach(t=>{
+   const tt=T[t], coil=timerCoil(t);
+   rows.push(diagItem(true,t,`Bobina ${coil?"ON":"OFF"} · ${tt.elapsed.toFixed(1)}/${tt.preset.toFixed(1)} s · DONE=${tt.done?1:0}`,"warn"));
+ });
+
+ const exp=expectedSpeedTags();
+ Object.keys(exp).forEach(tag=>{
+   const actual=val(S[tag],tag), expected=exp[tag];
+   if(expected){
+     add(actual,tag,actual?`Correcto para ${M.dir==="up"?"SUBIDA":"BAJADA"} velocidad ${M.speed}.`:`Debería estar energizado en velocidad ${M.speed} según la secuencia modelada.`);
+   }else{
+     rows.push(diagItem(!actual,tag,actual?`Está energizado aunque la secuencia normal de velocidad ${M.speed} no lo requiere. Puede existir una rama paralela o un forzado.`:`Correctamente desenergizado para velocidad ${M.speed}.`,actual?"warn":"ok"));
+   }
+ });
+
+ const summary=document.querySelector("#diagSummary");
+ if(causes.length===0){
+   summary.innerHTML=`<b>Cadena evaluada sin interrupciones principales.</b><br>${M.dir==="up"?"SUBIDA":"BAJADA"} · velocidad ${M.speed}. Los avisos amarillos muestran estados que requieren interpretación por temporización o ramas paralelas.`;
+ }else{
+   summary.innerHTML=`<b>Se detectaron ${causes.length} condición(es) que no coinciden con la lógica esperada.</b><br>Empieza por el primer punto rojo y continúa aguas abajo.`;
+ }
+ document.querySelector("#diagPath").innerHTML=rows.join("");
+}
+document.querySelector("#diagnoseBtn").onclick=diagnose;
+
 document.querySelector("#detailTab").onclick=()=>{
- document.querySelector("#detailPage").classList.add("active");document.querySelector("#monitorPage").classList.remove("active");
- document.querySelector("#detailTab").classList.add("active");document.querySelector("#monitorTab").classList.remove("active");
+ document.querySelector("#detailPage").classList.add("active");document.querySelector("#monitorPage").classList.remove("active");document.querySelector("#diagPage").classList.remove("active");
+ document.querySelector("#detailTab").classList.add("active");document.querySelector("#monitorTab").classList.remove("active");document.querySelector("#diagTab").classList.remove("active");
 };
 document.querySelector("#monitorTab").onclick=()=>{
- document.querySelector("#monitorPage").classList.add("active");document.querySelector("#detailPage").classList.remove("active");
- document.querySelector("#monitorTab").classList.add("active");document.querySelector("#detailTab").classList.remove("active");renderMonitor();
+ document.querySelector("#monitorPage").classList.add("active");document.querySelector("#detailPage").classList.remove("active");document.querySelector("#diagPage").classList.remove("active");
+ document.querySelector("#monitorTab").classList.add("active");document.querySelector("#detailTab").classList.remove("active");document.querySelector("#diagTab").classList.remove("active");renderMonitor();
+};
+document.querySelector("#diagTab").onclick=()=>{
+ document.querySelector("#diagPage").classList.add("active");document.querySelector("#detailPage").classList.remove("active");document.querySelector("#monitorPage").classList.remove("active");
+ document.querySelector("#diagTab").classList.add("active");document.querySelector("#detailTab").classList.remove("active");document.querySelector("#monitorTab").classList.remove("active");
+ diagnose();
 };
 document.querySelector("#mRaiseBtn").onclick=()=>{M.dir=M.dir==="up"?"neutral":"up";updateMoveUI();render()};
 document.querySelector("#mLowerBtn").onclick=()=>{M.dir=M.dir==="down"?"neutral":"down";updateMoveUI();render()};
